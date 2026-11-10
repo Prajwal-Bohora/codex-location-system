@@ -8,6 +8,7 @@ load_dotenv(BASE_DIR / ".env")
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "change-me-before-deployment")
+    INITIAL_ADMIN_SETUP_TOKEN = os.getenv("INITIAL_ADMIN_SETUP_TOKEN", "")
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL", f"sqlite:///{BASE_DIR / 'instance' / 'midwest_app.db'}"
     )

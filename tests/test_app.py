@@ -7,7 +7,7 @@ from models import Role, User
 
 class ApplicationSmokeTests(unittest.TestCase):
     def setUp(self):
-        self.app = create_app({"TESTING":True, "WTF_CSRF_ENABLED":False, "SQLALCHEMY_DATABASE_URI":"sqlite://"})
+        self.app = create_app({"TESTING":True, "WTF_CSRF_ENABLED":False, "SQLALCHEMY_DATABASE_URI":"sqlite://", "INITIAL_ADMIN_SETUP_TOKEN":"test-setup-token"})
         with self.app.app_context():
             db.drop_all()
             db.create_all()
@@ -38,7 +38,7 @@ class ApplicationSmokeTests(unittest.TestCase):
     def test_setup_creates_first_super_admin_once(self):
         page = self.client.get("/setup")
         token = re.search(r'name="csrf_token" value="([^"]+)"', page.get_data(as_text=True)).group(1)
-        response = self.client.post("/setup", data={"csrf_token":token, "full_name":"First Admin", "phone":"5552000", "password":"long-demo-password"})
+        response = self.client.post("/setup", data={"csrf_token":token, "setup_token":"test-setup-token", "full_name":"First Admin", "phone":"5552000", "password":"long-demo-password"})
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.client.get("/setup").status_code, 403)
 

@@ -1,4 +1,5 @@
 import os
+import hmac
 from pathlib import Path
 from flask import Flask, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import current_user, login_required
@@ -38,10 +39,15 @@ def create_app(config_override=None):
         return render_template("home.html")
     @app.get("/setup")
     def setup_page():
+        if not app.config.get("INITIAL_ADMIN_SETUP_TOKEN"):
+            return "Initial setup is disabled until INITIAL_ADMIN_SETUP_TOKEN is configured.",503
         if User.query.join(Role).filter(Role.name=="super_admin").first():return "Initial setup is already complete.",403
         return render_template("setup.html")
     @app.post("/setup")
     def setup():
+        setup_token=app.config.get("INITIAL_ADMIN_SETUP_TOKEN", "")
+        if not setup_token or not hmac.compare_digest(request.form.get("setup_token", ""),setup_token):
+            return "Invalid or missing initial setup token.",403
         if User.query.join(Role).filter(Role.name=="super_admin").first():return "Initial setup is already complete.",403
         from flask_wtf.csrf import validate_csrf
         try:validate_csrf(request.form.get("csrf_token"))

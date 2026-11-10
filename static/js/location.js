@@ -1,4 +1,5 @@
 (() => {
+  const pageState = window.MIDWEST || {routes:[], selectedRoute:null};
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
   const headers = {'Content-Type':'application/json','X-CSRFToken':csrf};
   const mapWith = (id, zoom=12) => {
@@ -24,7 +25,7 @@
   if(routeSel&&cpForm)routeSel.addEventListener('change',()=>{if(routeSel.value)cpForm.action=`/hod/routes/${routeSel.value}/checkpoints`;});
 
   const dmap=mapWith('driver-map');
-  if(dmap){(window.MIDWEST.routes||[]).forEach(r=>r.checkpoints.forEach(c=>L.marker([c.lat,c.lng]).addTo(dmap).bindPopup(escapeHtml(c.name))));}
+  if(dmap){(pageState.routes||[]).forEach(r=>(r.checkpoints||[]).forEach(c=>L.marker([c.lat,c.lng]).addTo(dmap).bindPopup(escapeHtml(c.name))));}
   const start=document.getElementById('start-sharing'),stop=document.getElementById('stop-sharing'),status=document.getElementById('sharing-status'),msg=document.getElementById('gps-message');
   if(start&&stop){let watch=null;
     const setUI=on=>{status.textContent=on?'Sharing location':'Not sharing';start.disabled=on;stop.disabled=!on;};
@@ -41,7 +42,7 @@
     stop.onclick=async()=>{if(watch!==null)navigator.geolocation.clearWatch(watch);watch=null;clearInterval(window.midwestUploadTimer);try{await fetchJson('/api/location/consent',{method:'POST',body:JSON.stringify({granted:false})});status.textContent='Consent withdrawn';msg.textContent='Sharing stopped and saved precise locations deleted.';}catch(e){msg.textContent=e.message;}setUI(false);};
   }
   const smap=mapWith('student-map');
-  if(smap&&window.MIDWEST.selectedRoute){fetchJson(`/api/location/route/${window.MIDWEST.selectedRoute}`).then(data=>{
+  if(smap&&pageState.selectedRoute){fetchJson(`/api/location/route/${pageState.selectedRoute}`).then(data=>{
     const pts=[];data.checkpoints.forEach(c=>{pts.push([c.lat,c.lng]);L.marker([c.lat,c.lng]).addTo(smap).bindPopup(`<strong>${escapeHtml(c.name)}</strong><br>${escapeHtml(c.description||'Pickup checkpoint')}`);});
     const box=document.getElementById('student-route-info');box.innerHTML=`<strong>${escapeHtml(data.name)}</strong>${data.vehicle?` · ${escapeHtml(data.vehicle)}`:''}<br>${data.drivers.map(d=>`Driver: ${escapeHtml(d.name)}${d.location?' · latest location available':' · not sharing'}`).join('<br>')||'No driver assigned yet.'}`;
     data.drivers.forEach(d=>{if(d.location){const p=[d.location.lat,d.location.lng];pts.push(p);L.circleMarker(p,{radius:9,color:'#e7663e'}).addTo(smap).bindPopup(`Assigned driver: ${escapeHtml(d.name)}`);}});if(pts.length)smap.fitBounds(pts,{padding:[30,30],maxZoom:14});

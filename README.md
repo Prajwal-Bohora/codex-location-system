@@ -38,7 +38,7 @@ The app creates missing tables and roles at startup. This is suitable for a fres
 
 ## First Super Admin
 
-Run the application and open `http://127.0.0.1:5000/setup` once. The setup page is disabled after the first Super Admin exists. It requires a unique phone number and password of at least 12 characters. Do not publish the setup endpoint or use the development `.env` in production.
+Set a separate `INITIAL_ADMIN_SETUP_TOKEN`, run the application, and open `http://127.0.0.1:5000/setup` once. Submit the token with the new account details. Setup is disabled after the first Super Admin exists, and it is unavailable if the token is unset. It requires a unique phone number and password of at least 12 characters. Clear the setup token from the deployment environment after creating the initial administrator.
 
 ## Run
 
