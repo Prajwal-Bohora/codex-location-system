@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
 from flask_login import login_required
 from werkzeug.security import generate_password_hash
 from extensions import db
@@ -13,9 +13,29 @@ bp = Blueprint("super_admin", __name__, url_prefix="/super-admin")
 def dashboard():
     users = User.query.order_by(User.created_at.desc()).all()
     counts = {r.name: User.query.join(Role).filter(Role.name == r.name).count() for r in Role.query.all()}
-    shared = LocationConsent.query.filter_by(granted=True).count()
+    shared = len(_latest_consented_locations())
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(20).all()
     return render_template("dashboard.html", title="Super Admin Dashboard", users=users, counts=counts, shared=shared, logs=logs, admin=True)
+
+def _latest_consented_locations():
+    rows = Location.query.join(LocationConsent, LocationConsent.user_id == Location.user_id).filter(LocationConsent.granted.is_(True)).order_by(Location.recorded_at.desc()).all()
+    latest = {}
+    for loc in rows:
+        latest.setdefault(loc.user_id, loc)
+    return latest.values()
+
+@bp.get("/users")
+@login_required
+@roles_required("super_admin")
+def user_list():
+    role_name = request.args.get("role", "all")
+    query = User.query.join(Role)
+    if role_name != "all":
+        if role_name not in {"student", "teacher", "driver", "admin", "super_admin"}:
+            abort(400)
+        query = query.filter(Role.name == role_name)
+    users = query.order_by(User.full_name).all()
+    return jsonify([{"id": u.id, "name": u.full_name, "phone": u.phone, "role": u.role_name, "active": u.active} for u in users])
 
 @bp.post("/users")
 @login_required
@@ -48,7 +68,5 @@ def toggle_user(user_id):
 @login_required
 @roles_required("super_admin")
 def locations():
-    rows = Location.query.join(LocationConsent, LocationConsent.user_id == Location.user_id).filter(LocationConsent.granted.is_(True)).order_by(Location.recorded_at.desc()).all()
-    latest = {}
-    for loc in rows: latest.setdefault(loc.user_id, loc)
-    return jsonify([{"name": l.user.full_name, "role": l.user.role_name, "lat": l.latitude, "lng": l.longitude, "accuracy": l.accuracy, "time": l.recorded_at.isoformat()} for l in latest.values()])
+    latest = _latest_consented_locations()
+    return jsonify([{"id": l.user_id, "name": l.user.full_name, "role": l.user.role_name, "lat": l.latitude, "lng": l.longitude, "accuracy": l.accuracy, "time": l.recorded_at.isoformat()} for l in latest])
