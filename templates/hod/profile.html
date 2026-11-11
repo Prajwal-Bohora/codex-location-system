@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+  <div><div class="eyebrow">HOD ADMINISTRATION / {{ user.role_name|upper }} PROFILE</div><h1 class="page-title">{{ user.full_name }}</h1><p class="text-muted mb-0">Account profile and assigned university transport details.</p></div>
+  <a class="btn btn-outline-primary" href="{{ url_for('hod.people',role_name=user.role_name) }}">Back to {{ user.role_name|title }} section</a>
+</div>
+<div class="row g-4">
+  <div class="col-lg-4"><div class="panel profile-card">
+    {% if user.role_name=='student' and user.student_profile and user.student_profile.id_photo %}<img class="student-photo mb-3" src="{{ url_for('uploads',filename=user.student_profile.id_photo) }}" alt="Student ID photo">{% else %}<div class="profile-avatar">{{ user.full_name[:1]|upper }}</div>{% endif %}
+    <h2>{{ user.full_name }}</h2><p class="text-muted">{{ user.role_name|replace('_',' ')|title }}</p><span class="badge {{ 'text-bg-success' if user.active else 'text-bg-secondary' }}">{{ 'Active' if user.active else 'Inactive' }}</span>
+  </div></div>
+  <div class="col-lg-8"><div class="panel"><h2>Profile details</h2>
+    <div class="profile-detail"><span>Phone</span><strong>{{ user.phone }}</strong></div>
+    <div class="profile-detail"><span>Account created</span><strong>{{ user.created_at.strftime('%Y-%m-%d') }}</strong></div>
+    {% if user.role_name=='student' %}
+      <div class="profile-detail"><span>Student number</span><strong>{{ user.student_profile.student_number if user.student_profile and user.student_profile.student_number else 'Not set' }}</strong></div>
+      <div class="profile-detail"><span>Department</span><strong>{{ user.student_profile.department if user.student_profile and user.student_profile.department else 'Not set' }}</strong></div>
+      <div class="profile-detail"><span>Year level</span><strong>{{ user.student_profile.year_level if user.student_profile and user.student_profile.year_level else 'Not set' }}</strong></div>
+      <div class="profile-detail"><span>Bus route</span><strong>{{ user.student_profile.route.name if user.student_profile and user.student_profile.route else 'No route assigned' }}</strong></div>
+    {% elif user.role_name=='driver' %}
+      <div class="profile-detail"><span>Location consent</span><strong>{{ 'Granted' if user.consent and user.consent.granted else 'Not sharing' }}</strong></div>
+      {% for assignment in assignments %}<div class="profile-detail"><span>Assigned route</span><strong>{{ assignment.route.name }}{% if assignment.vehicle %} · {{ assignment.vehicle }}{% endif %}</strong></div>{% else %}<div class="profile-detail"><span>Assigned route</span><strong>No route assigned</strong></div>{% endfor %}
+      {% if latest_location %}<div class="profile-detail"><span>Latest consented location</span><strong>{{ '%.5f'|format(latest_location.latitude) }}, {{ '%.5f'|format(latest_location.longitude) }} · {{ latest_location.recorded_at.strftime('%Y-%m-%d %H:%M') }}</strong></div>{% endif %}
+    {% else %}<div class="profile-detail"><span>Role</span><strong>Teacher</strong></div>{% endif %}
+  </div></div>
+</div>
+{% endblock %}

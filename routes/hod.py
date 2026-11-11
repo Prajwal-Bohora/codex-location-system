@@ -20,6 +20,29 @@ def dashboard():
         if l.user.role_name == "driver": latest.setdefault(l.user_id,l)
     return render_template("dashboard.html", title="HOD Administration", users=users, routes=routes, latest=list(latest.values()), admin=True)
 
+@bp.get("/people/<role_name>")
+@login_required
+@roles_required("admin")
+def people(role_name):
+    if role_name not in ("student", "teacher", "driver"):
+        return "Unknown people section", 404
+    role=Role.query.filter_by(name=role_name).first_or_404()
+    users=User.query.filter_by(role_id=role.id).order_by(User.full_name).all()
+    return render_template("hod/people.html", title=f"{role_name.title()} Section", role_name=role_name, users=users)
+
+@bp.get("/users/<int:user_id>")
+@login_required
+@roles_required("admin")
+def user_profile(user_id):
+    user=User.query.get_or_404(user_id)
+    if user.role_name not in ("student", "teacher", "driver"):
+        return "Profile not available in this section", 404
+    assignments=DriverAssignment.query.filter_by(driver_id=user.id,active=True).all() if user.role_name=="driver" else []
+    latest_location=None
+    if user.role_name=="driver" and user.consent and user.consent.granted:
+        latest_location=Location.query.filter_by(user_id=user.id).order_by(Location.recorded_at.desc()).first()
+    return render_template("hod/profile.html", title=f"{user.full_name} · Profile", user=user, assignments=assignments, latest_location=latest_location)
+
 @bp.post("/users")
 @login_required
 @roles_required("admin")
@@ -81,14 +104,14 @@ def add_checkpoint(route_id):
 @login_required
 @roles_required("admin")
 def delete_checkpoint(checkpoint_id):
-    checkpoint=RouteCheckpoint.query.get_or_404(checkpoint_id);db.session.delete(checkpoint);db.session.commit();flash("Checkpoint deleted.","success")
+    checkpoint=RouteCheckpoint.query.get_or_404(checkpoint_id);db.session.add(AuditLog(actor_id=current_user.id,action="checkpoint.deleted",target=f"{checkpoint.route.name}:{checkpoint.name}",ip_address=request.remote_addr));db.session.delete(checkpoint);db.session.commit();flash("Checkpoint deleted.","success")
     return redirect(url_for("hod.dashboard"))
 
 @bp.post("/routes/<int:route_id>/delete")
 @login_required
 @roles_required("admin")
 def delete_route(route_id):
-    route=BusRoute.query.get_or_404(route_id);db.session.delete(route);db.session.commit();flash("Route deleted.","success")
+    route=BusRoute.query.get_or_404(route_id);db.session.add(AuditLog(actor_id=current_user.id,action="route.deleted",target=route.name,ip_address=request.remote_addr));db.session.delete(route);db.session.commit();flash("Route and its checkpoints deleted. Students assigned to it are now unassigned.","success")
     return redirect(url_for("hod.dashboard"))
 
 @bp.post("/students/<int:user_id>/route")
