@@ -57,9 +57,24 @@
     statCards.forEach(card=>{const label=card.querySelector('span')?.textContent.trim();if(!label)return;card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label',`Open ${label} list`);card.addEventListener('click',()=>openSummary(label));card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openSummary(label);}});});
   }
   const cpMap=mapWith('checkpoint-map');
-  if(cpMap){let marker;cpMap.on('click',e=>{document.getElementById('latitude').value=e.latlng.lat.toFixed(7);document.getElementById('longitude').value=e.latlng.lng.toFixed(7);if(marker)marker.setLatLng(e.latlng);else marker=L.marker(e.latlng,{icon:checkpointIcon}).addTo(cpMap);});}
+  let draftCheckpointMarker=null;
+  const selectedCheckpointLayer=cpMap?L.layerGroup().addTo(cpMap):null;
+  if(cpMap){cpMap.on('click',e=>{document.getElementById('latitude').value=e.latlng.lat.toFixed(7);document.getElementById('longitude').value=e.latlng.lng.toFixed(7);if(draftCheckpointMarker)draftCheckpointMarker.setLatLng(e.latlng);else draftCheckpointMarker=L.marker(e.latlng,{icon:checkpointIcon}).addTo(cpMap);});}
   const routeSel=document.getElementById('route-select'),cpForm=document.getElementById('checkpoint-form');
-  if(routeSel&&cpForm)routeSel.addEventListener('change',()=>{if(routeSel.value)cpForm.action=`/hod/routes/${routeSel.value}/checkpoints`;});
+  if(routeSel&&cpForm)routeSel.addEventListener('change',()=>{
+    if(!routeSel.value){cpForm.removeAttribute('action');selectedCheckpointLayer?.clearLayers();return;}
+    cpForm.action=`/hod/routes/${routeSel.value}/checkpoints`;
+    selectedCheckpointLayer?.clearLayers();
+    if(draftCheckpointMarker){cpMap.removeLayer(draftCheckpointMarker);draftCheckpointMarker=null;}
+    document.getElementById('latitude').value='';document.getElementById('longitude').value='';
+    const route=(pageState.routes||[]).find(item=>String(item.id)===routeSel.value);
+    const points=[];
+    (route?.checkpoints||[]).forEach(checkpoint=>{
+      const point=[checkpoint.lat,checkpoint.lng];points.push(point);
+      L.marker(point,{icon:checkpointIcon}).addTo(selectedCheckpointLayer).bindPopup(`<strong>Checkpoint:</strong> ${escapeHtml(checkpoint.name)}`);
+    });
+    if(points.length)cpMap.fitBounds(points,{padding:[30,30],maxZoom:15});
+  });
 
   const dmap=mapWith('driver-map');
   if(dmap){(pageState.routes||[]).forEach(r=>(r.checkpoints||[]).forEach(c=>L.marker([c.lat,c.lng],{icon:checkpointIcon}).addTo(dmap).bindPopup(`<strong>Checkpoint:</strong> ${escapeHtml(c.name)}`)));}
