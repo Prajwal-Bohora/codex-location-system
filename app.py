@@ -38,10 +38,7 @@ def create_app(config_override=None):
         if not current_user.is_authenticated:return {"announcements":[]}
         role=current_user.role_name
         query=Announcement.query.filter_by(active=True)
-        if role=="super_admin":
-            pass
-        else:
-            query=query.filter(Announcement.audience.in_(("all",role)))
+        query=query.filter(Announcement.audience.in_(("all",role)))
         query=query.filter(or_(Announcement.expires_at.is_(None),Announcement.expires_at>datetime.utcnow()))
         return {"announcements":query.order_by(Announcement.urgent.desc(),Announcement.created_at.desc()).limit(5).all()}
     @app.get("/")

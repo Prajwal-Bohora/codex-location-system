@@ -5,10 +5,10 @@ import sqlite3
 import zipfile
 from pathlib import Path
 from datetime import datetime
-from flask_login import login_required
+from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from extensions import db
-from models import User, Role, AuditLog, Location, LocationConsent
+from models import User, Role, AuditLog, Location, LocationConsent, BusRoute, DriverAssignment
 from routes import roles_required
 from models import SystemSetting
 from services.privacy import get_location_retention_days, purge_expired_locations
@@ -25,6 +25,39 @@ def dashboard():
     shared = len(_latest_consented_locations())
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(20).all()
     return render_template("dashboard.html", title="Super Admin Dashboard", users=users, counts=counts, shared=shared, logs=logs, admin=True, retention_days=get_location_retention_days())
+
+@bp.get("/users/<int:user_id>")
+@login_required
+@roles_required("super_admin")
+def user_profile(user_id):
+    user=User.query.get_or_404(user_id)
+    if user.id==current_user.id or user.role_name=="super_admin":abort(404)
+    latest_location=None
+    if user.active and user.consent and user.consent.granted:
+        latest_location=Location.query.filter_by(user_id=user.id).order_by(Location.recorded_at.desc()).first()
+    assignments=DriverAssignment.query.filter_by(driver_id=user.id,active=True).all() if user.role_name=="driver" else []
+    routes=BusRoute.query.filter_by(active=True).order_by(BusRoute.name).all()
+    db.session.add(AuditLog(actor_id=current_user.id,action="profile.viewed",target=f"{user.role_name}:{user.id}",ip_address=request.remote_addr));db.session.commit()
+    return render_template("super_admin/profile.html",title=f"{user.full_name} · Profile",user=user,latest_location=latest_location,assignments=assignments,routes=routes)
+
+@bp.get("/routes")
+@login_required
+@roles_required("super_admin")
+def route_list():
+    routes=BusRoute.query.order_by(BusRoute.name).all()
+    db.session.add(AuditLog(actor_id=current_user.id,action="route.directory_viewed",target=f"{len(routes)} routes",ip_address=request.remote_addr));db.session.commit()
+    return render_template("super_admin/routes.html",title="University routes",routes=routes)
+
+@bp.get("/activity")
+@login_required
+@roles_required("super_admin")
+def activity():
+    role=request.args.get("role","all")
+    if role not in {"all","student","teacher","driver","admin","super_admin"}:abort(400)
+    query=AuditLog.query.outerjoin(User,AuditLog.actor_id==User.id).outerjoin(Role,User.role_id==Role.id)
+    if role!="all":query=query.filter(Role.name==role)
+    logs=query.order_by(AuditLog.created_at.desc()).limit(300).all()
+    return render_template("super_admin/activity.html",title="University activity",logs=logs,selected_role=role)
 
 @bp.post("/privacy/retention")
 @login_required
@@ -44,7 +77,7 @@ def set_location_retention():
     return redirect(url_for("super_admin.dashboard"))
 
 def _latest_consented_locations():
-    rows = Location.query.join(LocationConsent, LocationConsent.user_id == Location.user_id).filter(LocationConsent.granted.is_(True)).order_by(Location.recorded_at.desc()).all()
+    rows = Location.query.join(LocationConsent, LocationConsent.user_id == Location.user_id).join(User,User.id==Location.user_id).filter(LocationConsent.granted.is_(True),User.active.is_(True)).order_by(Location.recorded_at.desc()).all()
     latest = {}
     for loc in rows:
         latest.setdefault(loc.user_id, loc)
@@ -86,6 +119,9 @@ def toggle_user(user_id):
         flash("You cannot deactivate your own account.", "error")
     else:
         user.active = not user.active
+        if not user.active and user.role_name=="driver":
+            if user.consent:user.consent.granted=False;user.consent.withdrawn_at=datetime.utcnow()
+            Location.query.filter_by(user_id=user.id).delete()
         db.session.add(AuditLog(actor_id=__import__('flask_login').current_user.id, action="user.status_changed", target=user.phone, ip_address=request.remote_addr)); db.session.commit()
         flash("Account status updated.", "success")
     return redirect(url_for("super_admin.dashboard"))

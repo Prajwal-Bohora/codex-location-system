@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4"><div><div class="eyebrow">TEACHER / STUDENT PROFILE</div><h1 class="page-title">{{ student.full_name }}</h1><p class="text-muted mb-0">Academic profile available to teaching staff.</p></div><a class="btn btn-outline-primary" href="{{ url_for('teacher.dashboard') }}">Back to students</a></div>
+<div class="panel profile-card"><div class="profile-avatar">{{ student.full_name[:1]|upper }}</div><h2>{{ student.full_name }}</h2><p><strong>Student number:</strong> {{ student.student_profile.student_number if student.student_profile and student.student_profile.student_number else '—' }}</p><p><strong>Department:</strong> {{ student.student_profile.department if student.student_profile and student.student_profile.department else '—' }}</p><p><strong>Year level:</strong> {{ student.student_profile.year_level if student.student_profile and student.student_profile.year_level else '—' }}</p><p class="small text-muted mb-0">Student transport location data is not available to teachers.</p></div>
+{% endblock %}

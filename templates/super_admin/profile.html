@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+  <div><div class="eyebrow">SUPER ADMIN / USER PROFILE</div><h1 class="page-title">{{ user.full_name }}</h1><p class="text-muted mb-0">Read-only oversight profile · {{ user.role_name|replace('_',' ')|title }}</p></div>
+  <a class="btn btn-outline-primary" href="{{ url_for('super_admin.dashboard') }}">Back to dashboard</a>
+</div>
+<div class="row g-4">
+  <div class="col-lg-4"><div class="panel profile-card"><div class="profile-avatar">{{ user.full_name[:1]|upper }}</div><h2>{{ user.full_name }}</h2><p class="text-muted">{{ user.role_name|replace('_',' ')|title }}</p><span class="badge {{ 'text-bg-success' if user.active else 'text-bg-secondary' }}">{{ 'Active' if user.active else 'Inactive' }}</span><hr><p><strong>Phone:</strong> {{ user.phone }}</p><p><strong>Joined:</strong> {{ user.created_at.strftime('%Y-%m-%d') }}</p>
+    {% if user.role_name=='student' and user.student_profile %}<p><strong>Student number:</strong> {{ user.student_profile.student_number or '—' }}</p><p><strong>Department:</strong> {{ user.student_profile.department or '—' }}</p><p><strong>Year:</strong> {{ user.student_profile.year_level or '—' }}</p><p><strong>Assigned route:</strong> {{ user.student_profile.route.name if user.student_profile.route else 'None' }}</p>{% endif %}
+    {% if user.role_name=='driver' %}<h3 class="h6">Location sharing</h3><p>{{ 'Consent granted' if user.consent and user.consent.granted else 'Not sharing (or consent withdrawn)' }}</p>{% if assignments %}<h3 class="h6">Assigned routes</h3>{% for assignment in assignments %}<div class="list-row"><span>{{ assignment.route.name }}</span><span>{{ assignment.vehicle or assignment.route.vehicle or 'Vehicle not set' }}</span></div>{% endfor %}{% endif %}{% endif %}
+  </div></div>
+  <div class="col-lg-8">
+    {% if latest_location %}<div class="panel mb-4"><h2>Latest shared location</h2><p class="small text-muted">Consent is currently granted · recorded {{ latest_location.recorded_at.strftime('%Y-%m-%d %H:%M UTC') }} · accuracy ±{{ latest_location.accuracy|round|int }} m</p><div id="profile-location-map" class="map map-tall" data-lat="{{ latest_location.latitude }}" data-lng="{{ latest_location.longitude }}" data-name="{{ user.full_name }}"></div></div>{% elif user.consent and user.consent.granted %}<div class="panel mb-4"><h2>Location sharing</h2><p class="mb-0">Consent is granted, but no location has been recorded yet.</p></div>{% elif user.role_name=='driver' %}<div class="panel mb-4"><h2>Location sharing</h2><p class="mb-0">No live location is available because this user is not currently sharing.</p></div>{% endif %}
+    <div class="panel"><div class="panel-head"><div><h2>Transport routes</h2><p>Current routes and checkpoints recorded in the system.</p></div><a class="btn btn-sm btn-outline-primary" href="{{ url_for('super_admin.route_list') }}">All routes</a></div>
+      {% if user.role_name=='student' and user.student_profile and user.student_profile.route %}<h3 class="h6">Student's route</h3><div class="list-row"><span>{{ user.student_profile.route.name }}</span><span>{{ user.student_profile.route.vehicle or 'Vehicle not set' }}</span></div>{% for checkpoint in user.student_profile.route.checkpoints %}<div class="list-row"><span>{{ checkpoint.position + 1 }}. {{ checkpoint.name }}</span><small>{{ checkpoint.description or '' }}</small></div>{% endfor %}{% endif %}
+      {% if user.role_name=='driver' %}{% for assignment in assignments %}<h3 class="h6 mt-3">{{ assignment.route.name }}</h3>{% for checkpoint in assignment.route.checkpoints %}<div class="list-row"><span>{{ checkpoint.position + 1 }}. {{ checkpoint.name }}</span><small>{{ checkpoint.description or '' }}</small></div>{% else %}<p class="small text-muted">No checkpoints defined.</p>{% endfor %}{% endfor %}{% endif %}
+      {% if not assignments and (user.role_name!='student' or not user.student_profile or not user.student_profile.route) %}<p class="text-muted mb-0">No assigned transport route.</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>
+(()=>{const el=document.getElementById('profile-location-map');if(!el||!window.L)return;const lat=Number(el.dataset.lat),lng=Number(el.dataset.lng),map=L.map(el).setView([lat,lng],15);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);L.marker([lat,lng]).addTo(map).bindPopup(el.dataset.name+' · consented location').openPopup();})();
+</script>{% endblock %}

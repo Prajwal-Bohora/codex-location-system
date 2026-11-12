@@ -78,6 +78,7 @@ def user_profile(user_id):
         latest_location=Location.query.filter_by(user_id=user.id).order_by(Location.recorded_at.desc()).first()
     routes=BusRoute.query.filter_by(active=True).order_by(BusRoute.name).all() if user.role_name=="student" else []
     driver_profile=DriverProfile.query.filter_by(user_id=user.id).first() if user.role_name=="driver" else None
+    db.session.add(AuditLog(actor_id=current_user.id,action="profile.viewed",target=f"{user.role_name}:{user.id}",ip_address=request.remote_addr));db.session.commit()
     return render_template("hod/profile.html", title=f"{user.full_name} · Profile", user=user, assignments=assignments, latest_location=latest_location, routes=routes, driver_profile=driver_profile)
 
 @bp.post("/users/<int:user_id>/edit")
@@ -210,7 +211,9 @@ def add_checkpoint(route_id):
     except (TypeError,ValueError): flash("Select a valid point on the map first.","error");return redirect(url_for("hod.dashboard"))
     name=request.form.get("name", "").strip()
     if not name: flash("Checkpoint name is required.","error")
-    else: db.session.add(RouteCheckpoint(route_id=route.id,name=name,description=request.form.get("description"),latitude=lat,longitude=lng,position=len(route.checkpoints)));db.session.commit();flash("Checkpoint added.","success")
+    else:
+        checkpoint=RouteCheckpoint(route_id=route.id,name=name,description=request.form.get("description"),latitude=lat,longitude=lng,position=len(route.checkpoints));db.session.add(checkpoint)
+        db.session.add(AuditLog(actor_id=current_user.id,action="checkpoint.created",target=f"{route.name}:{name}",ip_address=request.remote_addr));db.session.commit();flash("Checkpoint added.","success")
     return redirect(url_for("hod.dashboard"))
 
 @bp.post("/checkpoints/<int:checkpoint_id>/edit")
@@ -252,5 +255,10 @@ def delete_route(route_id):
 @roles_required("admin")
 def assign_student_route(user_id):
     u=User.query.get_or_404(user_id)
-    if u.student_profile: u.student_profile.route_id=request.form.get("route_id",type=int) or None;db.session.commit();flash("Student route updated.","success")
+    if u.student_profile:
+        route_id=request.form.get("route_id",type=int);route=BusRoute.query.filter_by(id=route_id,active=True).first() if route_id else None
+        if route_id and not route:flash("Choose a valid active route.","error")
+        else:
+            u.student_profile.route_id=route.id if route else None
+            db.session.add(AuditLog(actor_id=current_user.id,action="student.route_assigned",target=f"student:{u.id} -> {route.name if route else 'none'}",ip_address=request.remote_addr));db.session.commit();flash("Student route updated.","success")
     return redirect(url_for("hod.dashboard"))

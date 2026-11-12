@@ -19,11 +19,13 @@ def login_post():
         flash("Phone number or password is incorrect.", "error")
         return render_template("login.html"), 401
     login_user(user, remember=bool(request.form.get("remember")))
+    db.session.add(AuditLog(actor_id=user.id,action="account.signed_in",ip_address=request.remote_addr));db.session.commit()
     return redirect(url_for("home"))
 
 @bp.post("/logout")
 @login_required
 def logout():
+    db.session.add(AuditLog(actor_id=current_user.id,action="account.signed_out",ip_address=request.remote_addr));db.session.commit()
     logout_user()
     flash("You have been signed out.", "success")
     return redirect(url_for("home"))

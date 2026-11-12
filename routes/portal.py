@@ -55,6 +55,7 @@ def toggle_announcement(announcement_id):
 @roles_required("admin")
 def student_requests():
     items=StudentRequest.query.order_by(StudentRequest.created_at.desc()).all()
+    db.session.add(AuditLog(actor_id=current_user.id,action="student_requests.inbox_viewed",target=f"{len(items)} requests",ip_address=request.remote_addr));db.session.commit()
     return render_template("portal/student_requests.html",title="Student support",requests=items)
 
 

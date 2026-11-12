@@ -12,7 +12,7 @@
   };
   const putMarkers=(map,items,markerIndex) => {
     if(!map)return;const pts=[];
-    items.forEach(x=>{const p=[x.lat,x.lng];pts.push(p);const marker=L.marker(p,{icon:driverIcon}).addTo(map).bindPopup(`<strong>${escapeHtml(x.name)}</strong><br>${escapeHtml(x.role||'User')} location · accuracy ±${Math.round(x.accuracy||0)} m`);if(markerIndex&&x.id!==undefined)markerIndex.set(Number(x.id),marker);});
+    items.forEach(x=>{const p=[x.lat,x.lng];pts.push(p);const profileLink=markerIndex&&x.id!==undefined?`<br><a href="/super-admin/users/${Number(x.id)}">View profile and routes</a>`:'';const marker=L.marker(p,{icon:driverIcon}).addTo(map).bindPopup(`<strong>${escapeHtml(x.name)}</strong><br>${escapeHtml(x.role||'User')} location · accuracy ±${Math.round(x.accuracy||0)} m${profileLink}`);if(markerIndex&&x.id!==undefined)markerIndex.set(Number(x.id),marker);});
     if(pts.length)map.fitBounds(pts,{padding:[30,30],maxZoom:14});
   };
   const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
