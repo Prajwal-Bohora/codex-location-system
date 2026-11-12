@@ -21,6 +21,7 @@ class User(UserMixin, db.Model):
     role = db.relationship("Role", back_populates="users")
     student_profile = db.relationship("StudentProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     consent = db.relationship("LocationConsent", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    driver_profile = db.relationship("DriverProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
     @property
     def role_name(self):

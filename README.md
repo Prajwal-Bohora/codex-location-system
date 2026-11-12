@@ -48,6 +48,16 @@ python app.py
 
 Open `http://127.0.0.1:5000`. Browser GPS works on localhost; remote deployments need HTTPS. Set `COOKIE_SECURE=1` behind HTTPS and use a strong secret. For a local demonstration, the checked-in `.env` selects SQLite so the app can start before MySQL is installed. Replace it with your own secrets and database URL for a shared environment.
 
+## University portal features
+
+- Campus announcements and event notices can be targeted to all users or students, teachers, drivers, or HOD/Admin. Urgent notices appear across the recipient's pages; notices can expire automatically.
+- Students can submit and track missed-pickup, profile-correction, and transport-support requests. HOD/Admin can update their status and reply.
+- HOD/Admin can download CSV exports for people and route/checkpoint records, edit profiles, and deactivate student, teacher, or driver accounts.
+- Driver profiles include emergency contact and usual shift details. The driver dashboard shows assigned routes, vehicle information, GPS sharing, and network status.
+- Super Admin can export audit logs, download a SQLite database plus uploads as a ZIP, and configure location retention. The default is 30 days; expired location records are purged at application startup and when Super Admin opens the dashboard. Changing the retention period immediately removes records older than that limit.
+
+Treat downloaded backups as sensitive: they contain account data, student photos, and location records. Store them securely.
+
 ## Roles and privacy
 
 - Super Admin manages all accounts, sees consented latest locations, and reviews audit activity.
@@ -75,4 +85,4 @@ For a full manual walkthrough, initialize Super Admin, create an HOD, create a d
 - `templates/`, `static/`: responsive Bootstrap UI, Leaflet maps, and browser GPS
 - `instance/`: local database and private uploaded photos (created automatically)
 
-This is an academic demonstration, not a substitute for security review, retention policy, operational monitoring, database backups, or production migrations.
+This is an academic demonstration. Production use still needs an operational backup schedule, security review, monitoring, and database migrations.

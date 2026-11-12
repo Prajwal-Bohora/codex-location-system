@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-4"><div class="eyebrow">STUDENT SERVICES</div><h1 class="page-title">Contact HOD/Admin</h1><p class="text-muted">Report a missed pickup, request a profile correction, or ask for transport help.</p></div>
+<div class="row g-4"><div class="col-lg-5"><div class="panel"><h2>New support request</h2><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="form-label mt-2">Request type</label><select class="form-select" name="category"><option value="missed_pickup">Missed pickup</option><option value="profile_update">Profile correction</option><option value="transport_issue">Transport issue</option><option value="other">Other</option></select>
+  <label class="form-label mt-3">Subject</label><input class="form-control" name="subject" maxlength="160" required>
+  <label class="form-label mt-3">Details</label><textarea class="form-control" name="message" rows="5" maxlength="4000" required></textarea>
+  <button class="btn btn-primary mt-3">Send request</button></form></div></div>
+  <div class="col-lg-7"><div class="panel"><h2>My requests</h2>{% for item in requests %}<article class="notice-item"><div class="d-flex justify-content-between gap-2"><strong>{{ item.subject }}</strong><span class="badge {{ 'text-bg-success' if item.status=='resolved' else 'text-bg-primary' if item.status=='in_progress' else 'text-bg-secondary' }}">{{ item.status|replace('_',' ')|title }}</span></div><small class="text-muted">{{ item.category|replace('_',' ')|title }} · {{ item.created_at.strftime('%b %d, %Y %H:%M') }}</small><p class="mb-1 mt-2">{{ item.message }}</p>{% if item.admin_note %}<p class="small text-muted mb-0">HOD/Admin: {{ item.admin_note }}</p>{% endif %}</article>{% else %}<p class="text-muted mt-3">You have not submitted any requests.</p>{% endfor %}</div></div>
+</div>
+{% endblock %}

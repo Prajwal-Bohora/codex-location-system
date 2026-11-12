@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="mb-4"><div class="eyebrow">HOD ADMINISTRATION / REPORTS</div><h1 class="page-title">University reports</h1><p class="text-muted">Download current account and transport-route data as CSV files.</p></div>
+<div class="row g-3"><div class="col-md-6"><div class="panel h-100"><h2>People directory</h2><p class="text-muted">Names, phone numbers, roles, student program details, and assigned student routes.</p><a class="btn btn-primary" href="{{ url_for('hod.export_users') }}">Download user report</a></div></div><div class="col-md-6"><div class="panel h-100"><h2>Transport routes</h2><p class="text-muted">Routes, vehicles, assigned drivers, and checkpoint coordinates and order.</p><a class="btn btn-primary" href="{{ url_for('hod.export_routes') }}">Download route report</a></div></div></div>
+{% endblock %}

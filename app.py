@@ -1,9 +1,10 @@
 import os
+from datetime import datetime
 import hmac
 from pathlib import Path
 from flask import Flask, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import current_user, login_required
-from sqlalchemy import event
+from sqlalchemy import event, or_
 from sqlalchemy.engine import Engine
 from config import Config
 from extensions import db, login_manager, csrf
@@ -20,7 +21,7 @@ def create_app(config_override=None):
     Path(app.instance_path).mkdir(parents=True,exist_ok=True)
     Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True,exist_ok=True)
     db.init_app(app);login_manager.init_app(app);csrf.init_app(app)
-    from models import User,Role
+    from models import User,Role,Announcement,SystemSetting
     from routes.auth import bp as auth_bp
     from routes.super_admin import bp as super_bp
     from routes.hod import bp as hod_bp
@@ -28,9 +29,21 @@ def create_app(config_override=None):
     from routes.driver import bp as driver_bp
     from routes.student import bp as student_bp
     from routes.location import bp as location_bp
-    for bp in (auth_bp,super_bp,hod_bp,teacher_bp,driver_bp,student_bp,location_bp):app.register_blueprint(bp)
+    from routes.portal import bp as portal_bp
+    for bp in (auth_bp,super_bp,hod_bp,teacher_bp,driver_bp,student_bp,location_bp,portal_bp):app.register_blueprint(bp)
     @login_manager.user_loader
     def load_user(user_id):return db.session.get(User,int(user_id))
+    @app.context_processor
+    def inject_announcements():
+        if not current_user.is_authenticated:return {"announcements":[]}
+        role=current_user.role_name
+        query=Announcement.query.filter_by(active=True)
+        if role=="super_admin":
+            pass
+        else:
+            query=query.filter(Announcement.audience.in_(("all",role)))
+        query=query.filter(or_(Announcement.expires_at.is_(None),Announcement.expires_at>datetime.utcnow()))
+        return {"announcements":query.order_by(Announcement.urgent.desc(),Announcement.created_at.desc()).limit(5).all()}
     @app.get("/")
     def home():
         if current_user.is_authenticated:
@@ -77,6 +90,10 @@ def create_app(config_override=None):
         for name in ("super_admin","admin","teacher","driver","student"):
             if not Role.query.filter_by(name=name).first():db.session.add(Role(name=name))
         db.session.commit()
+        if not SystemSetting.query.filter_by(key="location_retention_days").first():
+            db.session.add(SystemSetting(key="location_retention_days",value="30"));db.session.commit()
+        from services.privacy import purge_expired_locations, get_location_retention_days
+        purge_expired_locations(get_location_retention_days());db.session.commit()
     return app
 
 app = create_app()

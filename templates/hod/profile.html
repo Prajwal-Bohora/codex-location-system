@@ -1,27 +1,36 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
-  <div><div class="eyebrow">HOD ADMINISTRATION / {{ user.role_name|upper }} PROFILE</div><h1 class="page-title">{{ user.full_name }}</h1><p class="text-muted mb-0">Account profile and assigned university transport details.</p></div>
+  <div><div class="eyebrow">HOD ADMINISTRATION / {{ user.role_name|upper }} PROFILE</div><h1 class="page-title">{{ user.full_name }}</h1><p class="text-muted mb-0">View and update this person's account and university details.</p></div>
   <a class="btn btn-outline-primary" href="{{ url_for('hod.people',role_name=user.role_name) }}">Back to {{ user.role_name|title }} section</a>
 </div>
 <div class="row g-4">
   <div class="col-lg-4"><div class="panel profile-card">
     {% if user.role_name=='student' and user.student_profile and user.student_profile.id_photo %}<img class="student-photo mb-3" src="{{ url_for('uploads',filename=user.student_profile.id_photo) }}" alt="Student ID photo">{% else %}<div class="profile-avatar">{{ user.full_name[:1]|upper }}</div>{% endif %}
     <h2>{{ user.full_name }}</h2><p class="text-muted">{{ user.role_name|replace('_',' ')|title }}</p><span class="badge {{ 'text-bg-success' if user.active else 'text-bg-secondary' }}">{{ 'Active' if user.active else 'Inactive' }}</span>
+    {% if user.role_name=='driver' %}<hr><h3 class="h6">Location consent</h3><p>{{ 'Granted' if user.consent and user.consent.granted else 'Not sharing' }}</p>{% if latest_location %}<small class="text-muted">Last location: {{ latest_location.recorded_at.strftime('%Y-%m-%d %H:%M') }}</small>{% endif %}{% endif %}
   </div></div>
-  <div class="col-lg-8"><div class="panel"><h2>Profile details</h2>
-    <div class="profile-detail"><span>Phone</span><strong>{{ user.phone }}</strong></div>
-    <div class="profile-detail"><span>Account created</span><strong>{{ user.created_at.strftime('%Y-%m-%d') }}</strong></div>
-    {% if user.role_name=='student' %}
-      <div class="profile-detail"><span>Student number</span><strong>{{ user.student_profile.student_number if user.student_profile and user.student_profile.student_number else 'Not set' }}</strong></div>
-      <div class="profile-detail"><span>Department</span><strong>{{ user.student_profile.department if user.student_profile and user.student_profile.department else 'Not set' }}</strong></div>
-      <div class="profile-detail"><span>Year level</span><strong>{{ user.student_profile.year_level if user.student_profile and user.student_profile.year_level else 'Not set' }}</strong></div>
-      <div class="profile-detail"><span>Bus route</span><strong>{{ user.student_profile.route.name if user.student_profile and user.student_profile.route else 'No route assigned' }}</strong></div>
-    {% elif user.role_name=='driver' %}
-      <div class="profile-detail"><span>Location consent</span><strong>{{ 'Granted' if user.consent and user.consent.granted else 'Not sharing' }}</strong></div>
-      {% for assignment in assignments %}<div class="profile-detail"><span>Assigned route</span><strong>{{ assignment.route.name }}{% if assignment.vehicle %} · {{ assignment.vehicle }}{% endif %}</strong></div>{% else %}<div class="profile-detail"><span>Assigned route</span><strong>No route assigned</strong></div>{% endfor %}
-      {% if latest_location %}<div class="profile-detail"><span>Latest consented location</span><strong>{{ '%.5f'|format(latest_location.latitude) }}, {{ '%.5f'|format(latest_location.longitude) }} · {{ latest_location.recorded_at.strftime('%Y-%m-%d %H:%M') }}</strong></div>{% endif %}
-    {% else %}<div class="profile-detail"><span>Role</span><strong>Teacher</strong></div>{% endif %}
+  <div class="col-lg-8"><div class="panel"><h2>Edit profile</h2><p class="text-muted">Changes are recorded in the audit log.</p>
+    <form method="post" action="{{ url_for('hod.edit_user',user_id=user.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="form-label">Full name</label><input class="form-control mb-3" name="full_name" value="{{ user.full_name }}" required>
+      <label class="form-label">Phone number</label><input class="form-control mb-3" name="phone" value="{{ user.phone }}" required>
+      {% if user.role_name=='student' %}
+        <label class="form-label">Student number</label><input class="form-control mb-3" name="student_number" value="{{ user.student_profile.student_number if user.student_profile else '' }}">
+        <label class="form-label">Department</label><input class="form-control mb-3" name="department" value="{{ user.student_profile.department if user.student_profile else '' }}">
+        <label class="form-label">Year level</label><input class="form-control mb-3" name="year_level" value="{{ user.student_profile.year_level if user.student_profile else '' }}">
+        <label class="form-label">Bus route</label><select class="form-select mb-3" name="route_id"><option value="">No route assigned</option>{% for route in routes %}<option value="{{ route.id }}" {% if user.student_profile and user.student_profile.route_id==route.id %}selected{% endif %}>{{ route.name }}</option>{% endfor %}</select>
+      {% elif user.role_name=='driver' %}
+        <label class="form-label">Emergency contact name</label><input class="form-control mb-3" name="emergency_contact_name" value="{{ driver_profile.emergency_contact_name if driver_profile else '' }}">
+        <label class="form-label">Emergency contact phone</label><input class="form-control mb-3" name="emergency_contact_phone" value="{{ driver_profile.emergency_contact_phone if driver_profile else '' }}">
+        <h3 class="h6 mt-4">Usual driver shift</h3><label class="form-label">Days</label><input class="form-control mb-3" name="shift_days" value="{{ driver_profile.shift_days if driver_profile else '' }}" placeholder="e.g. Sunday–Thursday">
+        <div class="row"><div class="col-sm-6"><label class="form-label">Start time</label><input class="form-control mb-3" type="time" name="shift_start" value="{{ driver_profile.shift_start if driver_profile else '' }}"></div><div class="col-sm-6"><label class="form-label">End time</label><input class="form-control mb-3" type="time" name="shift_end" value="{{ driver_profile.shift_end if driver_profile else '' }}"></div></div>
+        <h3 class="h6 mt-4">Assigned routes</h3>{% for assignment in assignments %}<div class="list-row"><span>{{ assignment.route.name }}</span><span>{{ assignment.vehicle or assignment.route.vehicle or 'Vehicle not set' }}</span></div>{% else %}<p class="text-muted">No route assigned.</p>{% endfor %}<p class="form-text">Change driver and vehicle assignments from the route editor on HOD Administration.</p>
+      {% endif %}
+      <button class="btn btn-primary mt-2">Save profile</button>
+    </form>
+    <hr><form method="post" action="{{ url_for('hod.toggle_user',user_id=user.id) }}" onsubmit="return confirm('{{ 'Deactivate' if user.active else 'Reactivate' }} this account?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm {{ 'btn-outline-danger' if user.active else 'btn-outline-success' }}">{{ 'Deactivate account' if user.active else 'Reactivate account' }}</button></form>
+    {% if user.role_name=='student' and user.student_profile and user.student_profile.id_photo %}<hr><a href="{{ url_for('uploads',filename=user.student_profile.id_photo) }}" class="btn btn-outline-secondary btn-sm">View student ID photo</a>{% endif %}
   </div></div>
 </div>
 {% endblock %}

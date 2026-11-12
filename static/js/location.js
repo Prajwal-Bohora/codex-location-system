@@ -16,7 +16,17 @@
     if(pts.length)map.fitBounds(pts,{padding:[30,30],maxZoom:14});
   };
   const escapeHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const fetchJson=async(url,opts={})=>{const r=await fetch(url,{...opts,headers:{...headers,...opts.headers}});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'Request failed');return r.json();};
+  const fetchJson=async(url,opts={})=>{const r=await fetch(url,{cache:'no-store',...opts,headers:{...headers,...opts.headers}});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'Request failed');return r.json();};
+  const loadImage=url=>new Promise(resolve=>{if(!url){resolve(null);return;}const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>resolve(null);img.src=url;});
+  const networkStatus=document.getElementById('driver-network-status');
+  const updateNetworkStatus=()=>{if(!networkStatus)return;networkStatus.textContent=navigator.onLine?'Online':'Offline';networkStatus.classList.toggle('text-success',navigator.onLine);networkStatus.classList.toggle('text-danger',!navigator.onLine);};
+  if(networkStatus){updateNetworkStatus();window.addEventListener('online',updateNetworkStatus);window.addEventListener('offline',updateNetworkStatus);}
+  const announcementForm=document.getElementById('announcement-form');
+  if(announcementForm)announcementForm.addEventListener('submit',()=>{
+    for(const [localId,utcId] of [['event-at-local','event-at-utc'],['expires-at-local','expires-at-utc']]){
+      const local=document.getElementById(localId),utc=document.getElementById(utcId);utc.value=local.value?new Date(local.value).toISOString():'';
+    }
+  });
 
   const overviewMarkers=new Map();
   let overviewMap=null;
@@ -95,9 +105,60 @@
     stop.onclick=async()=>{if(watch!==null)navigator.geolocation.clearWatch(watch);watch=null;clearInterval(window.midwestUploadTimer);try{await fetchJson('/api/location/consent',{method:'POST',body:JSON.stringify({granted:false})});status.textContent='Consent withdrawn';msg.textContent='Sharing stopped and saved precise locations deleted.';}catch(e){msg.textContent=e.message;}setUI(false);};
   }
   const smap=mapWith('student-map');
-  if(smap&&pageState.selectedRoute){fetchJson(`/api/location/route/${pageState.selectedRoute}`).then(data=>{
-    const pts=[];data.checkpoints.forEach(c=>{pts.push([c.lat,c.lng]);L.marker([c.lat,c.lng],{icon:checkpointIcon}).addTo(smap).bindPopup(`<strong>Checkpoint:</strong> ${escapeHtml(c.name)}<br>${escapeHtml(c.description||'Pickup checkpoint')}`);});
-    const box=document.getElementById('student-route-info');box.innerHTML=`<strong>${escapeHtml(data.name)}</strong>${data.vehicle?` · ${escapeHtml(data.vehicle)}`:''}<br>${data.drivers.map(d=>`Driver: ${escapeHtml(d.name)}${d.location?' · latest location available':' · not sharing'}`).join('<br>')||'No driver assigned yet.'}`;
-    data.drivers.forEach(d=>{if(d.location){const p=[d.location.lat,d.location.lng];pts.push(p);L.marker(p,{icon:driverIcon}).addTo(smap).bindPopup(`Assigned driver: ${escapeHtml(d.name)}`);}});if(pts.length)smap.fitBounds(pts,{padding:[30,30],maxZoom:14});
-  }).catch(e=>{document.getElementById('student-route-info').textContent=e.message;});}
+  if(smap&&pageState.selectedRoute){
+    const checkpointLayer=L.layerGroup().addTo(smap),driverLayer=L.layerGroup().addTo(smap);
+    const box=document.getElementById('student-route-info');let firstLoad=true;let refreshTimer=null;
+    const refreshDriverLocations=async()=>{
+      try{
+        const data=await fetchJson(`/api/location/route/${pageState.selectedRoute}`);
+        const wasFirstLoad=firstLoad;
+        if(firstLoad){
+          data.checkpoints.forEach(c=>L.marker([c.lat,c.lng],{icon:checkpointIcon}).addTo(checkpointLayer).bindPopup(`<strong>Checkpoint:</strong> ${escapeHtml(c.name)}<br>${escapeHtml(c.description||'Pickup checkpoint')}`));
+          firstLoad=false;
+        }
+        driverLayer.clearLayers();
+        const statusRows=[];const livePoints=[];
+        data.drivers.forEach(d=>{
+          if(d.location){const p=[d.location.lat,d.location.lng];livePoints.push(p);L.marker(p,{icon:driverIcon}).addTo(driverLayer).bindPopup(`Assigned driver: ${escapeHtml(d.name)}<br>Updated: ${escapeHtml(new Date(d.location.time).toLocaleString())}`);statusRows.push(`<strong>${escapeHtml(d.name)}</strong> · updated ${escapeHtml(new Date(d.location.time).toLocaleString())}`);}
+          else statusRows.push(`<strong>${escapeHtml(d.name)}</strong> · not currently sharing`);
+        });
+        box.innerHTML=`<strong>${escapeHtml(data.name)}</strong>${data.vehicle?` · ${escapeHtml(data.vehicle)}`:''}<div class="mt-2">${statusRows.join('<br>')||'No driver assigned yet.'}</div><small class="text-muted d-block mt-2">Driver locations refresh every 15 seconds. Last checked: ${escapeHtml(new Date().toLocaleTimeString())}</small>`;
+        const allPoints=[...data.checkpoints.map(c=>[c.lat,c.lng]),...livePoints];
+        if(wasFirstLoad&&allPoints.length)smap.fitBounds(allPoints,{padding:[30,30],maxZoom:14});
+      }catch(error){box.textContent=error.message;}
+    };
+    refreshDriverLocations();refreshTimer=window.setInterval(refreshDriverLocations,15000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDriverLocations();});
+    window.addEventListener('pagehide',()=>{if(refreshTimer)window.clearInterval(refreshTimer);},{once:true});
+  }
+
+  const studentCanvas=document.getElementById('student-id-card');
+  const downloadCardButton=document.getElementById('download-student-card');
+  if(studentCanvas&&downloadCardButton&&pageState.studentCard){
+    const card=pageState.studentCard,ctx=studentCanvas.getContext('2d');
+    const roundedPath=(x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();};
+    const drawCover=(img,x,y,w,h)=>{const scale=Math.max(w/img.width,h/img.height),sw=w/scale,sh=h/scale,sx=(img.width-sw)/2,sy=(img.height-sh)/2;ctx.drawImage(img,sx,sy,sw,sh,x,y,w,h);};
+    const drawCard=async()=>{
+      const [logo,photo]=await Promise.all([loadImage(card.logoUrl),loadImage(card.photoUrl)]);
+      const w=studentCanvas.width,h=studentCanvas.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+      ctx.save();ctx.globalAlpha=.055;if(logo){const crop=logo.width*.63;ctx.drawImage(logo,(logo.width-crop)/2,(logo.height-crop)/2,crop,crop,1040,365,500,500);}ctx.restore();
+      ctx.fillStyle='#30343a';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(1190,0);ctx.lineTo(925,245);ctx.lineTo(95,245);ctx.lineTo(0,285);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#2799e8';ctx.beginPath();ctx.moveTo(1190,0);ctx.lineTo(w,0);ctx.lineTo(w,145);ctx.lineTo(1030,145);ctx.closePath();ctx.fill();
+      if(logo){const crop=logo.width*.63;ctx.save();roundedPath(78,47,145,145,72);ctx.clip();ctx.fillStyle='#fff';ctx.fillRect(78,47,145,145);ctx.drawImage(logo,(logo.width-crop)/2,(logo.height-crop)/2,crop,crop,78,47,145,145);ctx.restore();}
+      ctx.fillStyle='#fff';ctx.font='700 54px Manrope, Arial, sans-serif';ctx.fillText('MID-WESTERN UNIVERSITY',260,112,820);
+      ctx.fillStyle='#dce5ee';ctx.font='500 30px "DM Sans", Arial, sans-serif';ctx.fillText('STUDENT IDENTITY CARD',264,164);
+      ctx.fillStyle='#e9eef3';roundedPath(90,315,438,540,18);ctx.fill();
+      if(photo){ctx.save();roundedPath(100,325,418,520,12);ctx.clip();drawCover(photo,100,325,418,520);ctx.restore();}
+      else{ctx.save();roundedPath(100,325,418,520,12);ctx.fillStyle='#e9eef3';ctx.fill();ctx.fillStyle='#2467a5';ctx.font='700 140px Manrope, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText((card.name||'S').trim().charAt(0).toUpperCase(),309,585);ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.restore();}
+      const detail=(label,value,y,size=48)=>{ctx.fillStyle='#637180';ctx.font='400 30px "DM Sans", Arial, sans-serif';ctx.fillText(label,610,y);ctx.fillStyle='#141b22';ctx.font=`700 ${size}px Manrope, Arial, sans-serif`;ctx.fillText(value||'Not provided',610,y+58,875);};
+      detail('NAME',card.name,365,58);detail('STUDENT ID',card.studentId,520,50);detail('PROGRAMME / DEPARTMENT',card.department,675,43);detail('YEAR LEVEL',card.yearLevel,815,44);
+      ctx.fillStyle='#14856e';roundedPath(1190,825,300,70,18);ctx.fill();ctx.fillStyle='#fff';ctx.font='700 28px "DM Sans", Arial, sans-serif';ctx.textAlign='center';ctx.fillText(String(card.status||'Active').toUpperCase(),1340,871);ctx.textAlign='left';
+      ctx.fillStyle='#30343a';ctx.beginPath();ctx.moveTo(0,930);ctx.lineTo(1450,930);ctx.lineTo(1380,h);ctx.lineTo(0,h);ctx.closePath();ctx.fill();ctx.fillStyle='#2799e8';ctx.beginPath();ctx.moveTo(0,930);ctx.lineTo(165,930);ctx.lineTo(95,h);ctx.lineTo(0,h);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#dce5ee';ctx.font='500 24px "DM Sans", Arial, sans-serif';ctx.fillText('MID-WEST APP · PRIVACY-AWARE UNIVERSITY TRANSPORT',220,978);
+    };
+    drawCard();
+    downloadCardButton.addEventListener('click',()=>{
+      studentCanvas.toBlob(blob=>{if(!blob)return;const link=document.createElement('a');link.href=URL.createObjectURL(blob);const safeId=String(card.studentId||'student').replace(/[^a-z0-9_-]+/gi,'-');link.download=`midwest-student-id-${safeId}.png`;link.click();URL.revokeObjectURL(link.href);},'image/png');
+    });
+  }
 })();
