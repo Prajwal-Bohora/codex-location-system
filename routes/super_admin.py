@@ -12,6 +12,7 @@ from models import User, Role, AuditLog, Location, LocationConsent, BusRoute, Dr
 from routes import roles_required
 from models import SystemSetting
 from services.privacy import get_location_retention_days, purge_expired_locations
+from services.timezone import to_nepal_time
 
 bp = Blueprint("super_admin", __name__, url_prefix="/super-admin")
 
@@ -47,6 +48,26 @@ def route_list():
     routes=BusRoute.query.order_by(BusRoute.name).all()
     db.session.add(AuditLog(actor_id=current_user.id,action="route.directory_viewed",target=f"{len(routes)} routes",ip_address=request.remote_addr));db.session.commit()
     return render_template("super_admin/routes.html",title="University routes",routes=routes)
+
+@bp.get("/routes/<int:route_id>")
+@login_required
+@roles_required("super_admin")
+def route_detail(route_id):
+    route=BusRoute.query.get_or_404(route_id)
+    assignments=DriverAssignment.query.filter_by(route_id=route.id,active=True).all()
+    drivers=[];map_drivers=[]
+    for assignment in assignments:
+        driver=assignment.driver
+        if not driver or not driver.active or driver.role_name!="driver":continue
+        location=None
+        if driver.consent and driver.consent.granted:
+            location=Location.query.filter_by(user_id=driver.id).order_by(Location.recorded_at.desc()).first()
+        drivers.append({"user":driver,"assignment":assignment,"location":location})
+        if location:
+            map_drivers.append({"name":driver.full_name,"lat":location.latitude,"lng":location.longitude,"time":location.recorded_at.isoformat()})
+    checkpoints=[{"name":c.name,"description":c.description,"lat":c.latitude,"lng":c.longitude,"position":c.position} for c in route.checkpoints]
+    db.session.add(AuditLog(actor_id=current_user.id,action="route.viewed",target=route.name,ip_address=request.remote_addr));db.session.commit()
+    return render_template("super_admin/route_detail.html",title=f"{route.name} · Route",route=route,drivers=drivers,map_data={"checkpoints":checkpoints,"drivers":map_drivers})
 
 @bp.get("/activity")
 @login_required
@@ -138,9 +159,9 @@ def locations():
 @roles_required("super_admin")
 def export_audit():
     output=StringIO();writer=csv.writer(output)
-    writer.writerow(["Timestamp","Actor","Action","Target","IP address"])
+    writer.writerow(["Timestamp (NPT)","Actor","Action","Target","IP address"])
     for entry in AuditLog.query.order_by(AuditLog.created_at.desc()).all():
-        writer.writerow([entry.created_at.isoformat(),entry.actor.full_name if entry.actor else "System",entry.action,entry.target or "",entry.ip_address or ""])
+        writer.writerow([to_nepal_time(entry.created_at).isoformat(timespec="seconds"),entry.actor.full_name if entry.actor else "System",entry.action,entry.target or "",entry.ip_address or ""])
     return Response("\ufeff"+output.getvalue(),mimetype="text/csv; charset=utf-8",headers={"Content-Disposition":"attachment; filename=midwest-audit-log.csv"})
 
 @bp.get("/backup.sqlite.zip")

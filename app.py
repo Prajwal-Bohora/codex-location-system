@@ -8,6 +8,7 @@ from sqlalchemy import event, or_
 from sqlalchemy.engine import Engine
 from config import Config
 from extensions import db, login_manager, csrf
+from services.timezone import format_nepal_time
 
 @event.listens_for(Engine,"connect")
 def _sqlite_fk(dbapi_connection, connection_record):
@@ -21,7 +22,7 @@ def create_app(config_override=None):
     Path(app.instance_path).mkdir(parents=True,exist_ok=True)
     Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True,exist_ok=True)
     db.init_app(app);login_manager.init_app(app);csrf.init_app(app)
-    from models import User,Role,Announcement,SystemSetting
+    from models import User,Role,Announcement,SystemSetting,AuditLog
     from routes.auth import bp as auth_bp
     from routes.super_admin import bp as super_bp
     from routes.hod import bp as hod_bp
@@ -33,14 +34,23 @@ def create_app(config_override=None):
     for bp in (auth_bp,super_bp,hod_bp,teacher_bp,driver_bp,student_bp,location_bp,portal_bp):app.register_blueprint(bp)
     @login_manager.user_loader
     def load_user(user_id):return db.session.get(User,int(user_id))
+    @app.template_filter("nepal_time")
+    def nepal_time_filter(value,fmt="%Y-%m-%d %I:%M:%S %p NPT"):
+        return format_nepal_time(value,fmt)
     @app.context_processor
     def inject_announcements():
         if not current_user.is_authenticated:return {"announcements":[]}
-        role=current_user.role_name
         query=Announcement.query.filter_by(active=True)
-        query=query.filter(Announcement.audience.in_(("all",role)))
         query=query.filter(or_(Announcement.expires_at.is_(None),Announcement.expires_at>datetime.utcnow()))
-        return {"announcements":query.order_by(Announcement.urgent.desc(),Announcement.created_at.desc()).limit(5).all()}
+        return {"announcements":query.order_by(Announcement.urgent.desc(),Announcement.created_at.desc()).all()}
+    @app.before_request
+    def delete_expired_announcements():
+        expired=Announcement.query.filter(Announcement.expires_at.is_not(None),Announcement.expires_at<=datetime.utcnow()).all()
+        if expired:
+            for item in expired:
+                db.session.add(AuditLog(action="announcement.expired_deleted",target=item.title))
+                db.session.delete(item)
+            db.session.commit()
     @app.get("/")
     def home():
         if current_user.is_authenticated:

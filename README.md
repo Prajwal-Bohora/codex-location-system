@@ -50,12 +50,13 @@ Open `http://127.0.0.1:5000`. Browser GPS works on localhost; remote deployments
 
 ## University portal features
 
-- Campus announcements and event notices can be targeted to all users or students, teachers, drivers, or HOD/Admin. Urgent notices appear across the recipient's pages; notices can expire automatically.
+- Every published announcement is visible to all signed-in roles. Notices appear one at a time in an auto-advancing carousel and expire from view at the configured time; expired records and their question threads are deleted on the next application request.
 - Notices targeted to “all” are shown to every signed-in role, including Super Admin.
 - Announcement authors can delete their own notices. Recipients can privately ask the posting authority a question; the authority can reply from announcement management.
 - Students can submit and track missed-pickup, profile-correction, and transport-support requests. HOD/Admin can update their status and reply.
 - Teachers can open read-only academic profiles for students. HOD/Admin can view student, teacher, and driver profiles; Super Admin can view lower-role profiles and consented current locations.
 - Super Admin can review active routes and checkpoints, and filter the activity history by the role of the person who performed each action.
+- Super Admin route cards open a route-specific map with its checkpoints and only the active, consent-sharing driver assigned to that route.
 - The activity history records sign-ins, profile access, route assignments and changes, checkpoint changes, support request handling, announcements, and location consent changes. It does not record every GPS ping or store full support messages in the audit log.
 - HOD/Admin can download CSV exports for people and route/checkpoint records, edit profiles, and deactivate student, teacher, or driver accounts.
 - Driver profiles include emergency contact and usual shift details. The driver dashboard shows assigned routes, vehicle information, GPS sharing, and network status.

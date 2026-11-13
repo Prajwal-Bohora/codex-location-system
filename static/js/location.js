@@ -39,6 +39,13 @@
   for(const [id,endpoint] of [['overview-map','/super-admin/locations'],['hod-map','/api/location/drivers']]){
     const map=mapWith(id);if(id==='overview-map')overviewMap=map;if(map)fetchJson(endpoint).then(x=>putMarkers(map,x,id==='overview-map'?overviewMarkers:null)).catch(()=>{});
   }
+  const routeDetailMap=mapWith('super-admin-route-map');
+  if(routeDetailMap){
+    const routeData=window.MIDWEST_ROUTE_MAP||{},points=[];
+    (routeData.checkpoints||[]).forEach((checkpoint,index)=>{const point=[checkpoint.lat,checkpoint.lng];points.push(point);L.marker(point,{icon:checkpointIcon}).addTo(routeDetailMap).bindPopup(`<strong>Checkpoint ${index+1}:</strong> ${escapeHtml(checkpoint.name)}${checkpoint.description?`<br>${escapeHtml(checkpoint.description)}`:''}`);});
+    (routeData.drivers||[]).forEach(driver=>{const point=[driver.lat,driver.lng];points.push(point);L.marker(point,{icon:driverIcon}).addTo(routeDetailMap).bindPopup(`<strong>${escapeHtml(driver.name)}</strong><br>Assigned driver · sharing location<br>${escapeHtml(new Date(driver.time).toLocaleString())}`);});
+    if(points.length)routeDetailMap.fitBounds(points,{padding:[36,36],maxZoom:15});
+  }
   const statCards=document.querySelectorAll('.row.g-3.mb-4 .stat-card');
   if(statCards.length&&overviewMap){
     const modalNode=document.createElement('div');

@@ -6,9 +6,6 @@ from models import Announcement, AnnouncementQuery, AuditLog, StudentRequest
 from routes import roles_required
 
 bp = Blueprint("portal", __name__, url_prefix="/portal")
-AUDIENCES = {"all", "student", "teacher", "driver", "admin"}
-
-
 @bp.get("/announcements")
 @login_required
 @roles_required("admin", "super_admin")
@@ -21,7 +18,7 @@ def announcements():
 @login_required
 def announcement_feed():
     now=datetime.utcnow()
-    items=Announcement.query.filter_by(active=True).filter(Announcement.audience.in_(("all",current_user.role_name))).filter((Announcement.expires_at.is_(None)) | (Announcement.expires_at>now)).order_by(Announcement.urgent.desc(),Announcement.created_at.desc()).all()
+    items=Announcement.query.filter_by(active=True).filter((Announcement.expires_at.is_(None)) | (Announcement.expires_at>now)).order_by(Announcement.urgent.desc(),Announcement.created_at.desc()).all()
     return render_template("portal/announcement_feed.html",title="Announcements and questions",announcements=items)
 
 
@@ -29,7 +26,7 @@ def announcement_feed():
 @login_required
 def ask_announcement_question(announcement_id):
     item=Announcement.query.get_or_404(announcement_id)
-    visible=item.active and item.audience in ("all",current_user.role_name) and (not item.expires_at or item.expires_at>datetime.utcnow())
+    visible=item.active and (not item.expires_at or item.expires_at>datetime.utcnow())
     body=request.form.get("body","").strip()
     if not visible:
         return "This announcement is not available to your account.",404
@@ -77,7 +74,7 @@ def delete_announcement(announcement_id):
 @login_required
 @roles_required("admin", "super_admin")
 def create_announcement():
-    title=request.form.get("title", "").strip();body=request.form.get("body", "").strip();audience=request.form.get("audience", "all")
+    title=request.form.get("title", "").strip();body=request.form.get("body", "").strip()
     try:
         event_at=datetime.fromisoformat(request.form["event_at"]) if request.form.get("event_at") else None
         expires_at=datetime.fromisoformat(request.form["expires_at"]) if request.form.get("expires_at") else None
@@ -85,12 +82,12 @@ def create_announcement():
         if expires_at and expires_at.tzinfo:expires_at=expires_at.astimezone(timezone.utc).replace(tzinfo=None)
     except ValueError:
         flash("Enter a valid event or expiry date.","error");return redirect(url_for("portal.announcements"))
-    if not title or not body or audience not in AUDIENCES:
-        flash("Enter a title, message, and valid audience.","error")
+    if not title or not body:
+        flash("Enter a title and message.","error")
     elif expires_at and expires_at <= datetime.utcnow():
         flash("The expiry time must be in the future.","error")
     else:
-        announcement=Announcement(author_id=current_user.id,title=title,body=body,audience=audience,event_at=event_at,expires_at=expires_at,urgent=bool(request.form.get("urgent")))
+        announcement=Announcement(author_id=current_user.id,title=title,body=body,audience="all",event_at=event_at,expires_at=expires_at,urgent=bool(request.form.get("urgent")))
         db.session.add(announcement);db.session.add(AuditLog(actor_id=current_user.id,action="announcement.created",target=title,ip_address=request.remote_addr));db.session.commit()
         flash("Announcement published.","success")
     return redirect(url_for("portal.announcements"))
