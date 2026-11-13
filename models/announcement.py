@@ -14,3 +14,18 @@ class Announcement(db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True, index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
     author = db.relationship("User")
+    queries = db.relationship("AnnouncementQuery", back_populates="announcement", cascade="all, delete-orphan", order_by="AnnouncementQuery.created_at.desc()")
+
+
+class AnnouncementQuery(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    announcement_id = db.Column(db.Integer, db.ForeignKey("announcement.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True)
+    body = db.Column(db.Text, nullable=False)
+    reply = db.Column(db.Text)
+    replied_by = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="SET NULL"))
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    replied_at = db.Column(db.DateTime)
+    announcement = db.relationship("Announcement", back_populates="queries")
+    asker = db.relationship("User", foreign_keys=[user_id])
+    responder = db.relationship("User", foreign_keys=[replied_by])

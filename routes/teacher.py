@@ -9,7 +9,8 @@ bp=Blueprint("teacher",__name__,url_prefix="/teacher")
 @roles_required("teacher")
 def dashboard():
     students=User.query.join(Role).filter(Role.name=="student",User.active.is_(True)).order_by(User.full_name).all()
-    return render_template("dashboard.html",title="Teacher Dashboard",users=students,teacher=True)
+    departments=sorted({u.student_profile.department for u in students if u.student_profile and u.student_profile.department})
+    return render_template("dashboard.html",title="Teacher Dashboard",users=students,teacher=True,departments=departments)
 
 @bp.get("/students/<int:user_id>")
 @login_required

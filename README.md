@@ -52,6 +52,7 @@ Open `http://127.0.0.1:5000`. Browser GPS works on localhost; remote deployments
 
 - Campus announcements and event notices can be targeted to all users or students, teachers, drivers, or HOD/Admin. Urgent notices appear across the recipient's pages; notices can expire automatically.
 - Notices targeted to “all” are shown to every signed-in role, including Super Admin.
+- Announcement authors can delete their own notices. Recipients can privately ask the posting authority a question; the authority can reply from announcement management.
 - Students can submit and track missed-pickup, profile-correction, and transport-support requests. HOD/Admin can update their status and reply.
 - Teachers can open read-only academic profiles for students. HOD/Admin can view student, teacher, and driver profiles; Super Admin can view lower-role profiles and consented current locations.
 - Super Admin can review active routes and checkpoints, and filter the activity history by the role of the person who performed each action.

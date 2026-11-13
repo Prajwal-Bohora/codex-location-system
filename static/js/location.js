@@ -21,6 +21,12 @@
   const networkStatus=document.getElementById('driver-network-status');
   const updateNetworkStatus=()=>{if(!networkStatus)return;networkStatus.textContent=navigator.onLine?'Online':'Offline';networkStatus.classList.toggle('text-success',navigator.onLine);networkStatus.classList.toggle('text-danger',!navigator.onLine);};
   if(networkStatus){updateNetworkStatus();window.addEventListener('online',updateNetworkStatus);window.addEventListener('offline',updateNetworkStatus);}
+  const teacherSearch=document.getElementById('teacher-student-search'),teacherDepartment=document.getElementById('teacher-department-filter');
+  if(teacherSearch&&teacherDepartment){
+    const cards=[...document.querySelectorAll('.teacher-student-item')],count=document.getElementById('teacher-student-count'),empty=document.getElementById('teacher-student-empty');
+    const filterStudents=()=>{const term=teacherSearch.value.trim().toLocaleLowerCase(),department=teacherDepartment.value.trim().toLocaleLowerCase();let visible=0;cards.forEach(card=>{const matches=card.dataset.search.includes(term)&&(!department||card.dataset.department.toLocaleLowerCase()===department);card.classList.toggle('d-none',!matches);if(matches)visible++;});count.textContent=`${visible} OF ${cards.length} STUDENTS`;empty.classList.toggle('d-none',visible!==0||cards.length===0);};
+    teacherSearch.addEventListener('input',filterStudents);teacherDepartment.addEventListener('change',filterStudents);
+  }
   const announcementForm=document.getElementById('announcement-form');
   if(announcementForm)announcementForm.addEventListener('submit',()=>{
     for(const [localId,utcId] of [['event-at-local','event-at-utc'],['expires-at-local','expires-at-utc']]){

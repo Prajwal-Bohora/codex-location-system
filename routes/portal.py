@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from extensions import db
-from models import Announcement, AuditLog, StudentRequest
+from models import Announcement, AnnouncementQuery, AuditLog, StudentRequest
 from routes import roles_required
 
 bp = Blueprint("portal", __name__, url_prefix="/portal")
@@ -15,6 +15,62 @@ AUDIENCES = {"all", "student", "teacher", "driver", "admin"}
 def announcements():
     items=Announcement.query.order_by(Announcement.created_at.desc()).all()
     return render_template("portal/announcements.html",title="Campus announcements",announcements=items)
+
+
+@bp.get("/notices")
+@login_required
+def announcement_feed():
+    now=datetime.utcnow()
+    items=Announcement.query.filter_by(active=True).filter(Announcement.audience.in_(("all",current_user.role_name))).filter((Announcement.expires_at.is_(None)) | (Announcement.expires_at>now)).order_by(Announcement.urgent.desc(),Announcement.created_at.desc()).all()
+    return render_template("portal/announcement_feed.html",title="Announcements and questions",announcements=items)
+
+
+@bp.post("/notices/<int:announcement_id>/questions")
+@login_required
+def ask_announcement_question(announcement_id):
+    item=Announcement.query.get_or_404(announcement_id)
+    visible=item.active and item.audience in ("all",current_user.role_name) and (not item.expires_at or item.expires_at>datetime.utcnow())
+    body=request.form.get("body","").strip()
+    if not visible:
+        return "This announcement is not available to your account.",404
+    if not body or len(body)>3000:
+        flash("Enter a question of up to 3,000 characters.","error")
+    else:
+        query=AnnouncementQuery(announcement_id=item.id,user_id=current_user.id,body=body);db.session.add(query);db.session.flush()
+        db.session.add(AuditLog(actor_id=current_user.id,action="announcement.question_submitted",target=f"notice:{item.id} · question:{query.id}",ip_address=request.remote_addr));db.session.commit()
+        flash("Your question was sent to the authority who posted this notice.","success")
+    return redirect(url_for("portal.announcement_feed"))
+
+
+@bp.post("/questions/<int:query_id>/reply")
+@login_required
+@roles_required("admin","super_admin")
+def reply_announcement_question(query_id):
+    query=AnnouncementQuery.query.get_or_404(query_id)
+    item=query.announcement
+    if current_user.id!=item.author_id and current_user.role_name!="super_admin":
+        return "Only the notice authority can reply.",403
+    reply=request.form.get("reply","").strip()
+    if not reply or len(reply)>3000:
+        flash("Enter a reply of up to 3,000 characters.","error")
+    else:
+        query.reply=reply;query.replied_by=current_user.id;query.replied_at=datetime.utcnow()
+        db.session.add(AuditLog(actor_id=current_user.id,action="announcement.question_replied",target=f"notice:{item.id} · question:{query.id}",ip_address=request.remote_addr));db.session.commit()
+        flash("Reply sent to the person who asked.","success")
+    return redirect(url_for("portal.announcements"))
+
+
+@bp.post("/announcements/<int:announcement_id>/delete")
+@login_required
+@roles_required("admin","super_admin")
+def delete_announcement(announcement_id):
+    item=Announcement.query.get_or_404(announcement_id)
+    if item.author_id!=current_user.id:
+        return "You can delete only announcements you posted.",403
+    title=item.title
+    db.session.add(AuditLog(actor_id=current_user.id,action="announcement.deleted",target=title,ip_address=request.remote_addr));db.session.delete(item);db.session.commit()
+    flash("Your announcement and its question thread were deleted.","success")
+    return redirect(url_for("portal.announcements"))
 
 
 @bp.post("/announcements")
