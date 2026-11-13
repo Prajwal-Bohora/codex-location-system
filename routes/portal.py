@@ -1,9 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from extensions import db
 from models import Announcement, AnnouncementQuery, AuditLog, StudentRequest
 from routes import roles_required
+from services.timezone import nepal_time_to_utc_naive
 
 bp = Blueprint("portal", __name__, url_prefix="/portal")
 @bp.get("/announcements")
@@ -78,8 +79,8 @@ def create_announcement():
     try:
         event_at=datetime.fromisoformat(request.form["event_at"]) if request.form.get("event_at") else None
         expires_at=datetime.fromisoformat(request.form["expires_at"]) if request.form.get("expires_at") else None
-        if event_at and event_at.tzinfo:event_at=event_at.astimezone(timezone.utc).replace(tzinfo=None)
-        if expires_at and expires_at.tzinfo:expires_at=expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+        if event_at:event_at=nepal_time_to_utc_naive(event_at)
+        if expires_at:expires_at=nepal_time_to_utc_naive(expires_at)
     except ValueError:
         flash("Enter a valid event or expiry date.","error");return redirect(url_for("portal.announcements"))
     if not title or not body:

@@ -29,8 +29,9 @@
   }
   const announcementForm=document.getElementById('announcement-form');
   if(announcementForm)announcementForm.addEventListener('submit',()=>{
+    const nepalWallTimeToUtc=value=>{if(!value)return '';const [date,time]=value.split('T'),[year,month,day]=date.split('-').map(Number),[hour,minute]=time.split(':').map(Number);return new Date(Date.UTC(year,month-1,day,hour,minute)-345*60*1000).toISOString();};
     for(const [localId,utcId] of [['event-at-local','event-at-utc'],['expires-at-local','expires-at-utc']]){
-      const local=document.getElementById(localId),utc=document.getElementById(utcId);utc.value=local.value?new Date(local.value).toISOString():'';
+      const local=document.getElementById(localId),utc=document.getElementById(utcId);utc.value=nepalWallTimeToUtc(local.value);
     }
   });
 

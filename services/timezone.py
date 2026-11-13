@@ -11,6 +11,12 @@ def to_nepal_time(value):
     return value.astimezone(NEPAL_TZ)
 
 
+def nepal_time_to_utc_naive(value):
+    if value.tzinfo is None:
+        value=value.replace(tzinfo=NEPAL_TZ)
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def format_nepal_time(value,fmt="%Y-%m-%d %I:%M:%S %p NPT"):
     converted=to_nepal_time(value)
     return converted.strftime(fmt) if converted else "—"

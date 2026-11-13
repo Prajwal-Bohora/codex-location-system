@@ -50,7 +50,7 @@ Open `http://127.0.0.1:5000`. Browser GPS works on localhost; remote deployments
 
 ## University portal features
 
-- Every published announcement is visible to all signed-in roles. Notices appear one at a time in an auto-advancing carousel and expire from view at the configured time; expired records and their question threads are deleted on the next application request.
+- Every published announcement is visible to all signed-in roles. Event and expiry fields are entered and displayed in Nepal Time (NPT). Notices appear one at a time in an auto-advancing carousel and expire from view at the configured time; expired records and their question threads are deleted on the next application request.
 - Notices targeted to “all” are shown to every signed-in role, including Super Admin.
 - Announcement authors can delete their own notices. Recipients can privately ask the posting authority a question; the authority can reply from announcement management.
 - Students can submit and track missed-pickup, profile-correction, and transport-support requests. HOD/Admin can update their status and reply.
