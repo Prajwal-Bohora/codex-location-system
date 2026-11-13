@@ -1,32 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
-  <div><div class="eyebrow">HOD ADMINISTRATION / PEOPLE</div><h1 class="page-title">{{ title }}</h1><p class="text-muted mb-0">Open a profile{% if role_name=='student' %}, assign a route, or upload the student ID photo{% endif %}.</p></div>
+  <div><div class="eyebrow">HOD ADMINISTRATION / PEOPLE</div><h1 class="page-title">{{ title }}</h1><p class="text-muted mb-0">Click a person to open their profile and details.</p></div>
   <a class="btn btn-outline-primary" href="{{ url_for('hod.dashboard') }}">Back to dashboard</a>
 </div>
 <div class="panel">
   <div class="panel-head"><div><h2>{{ users|length }} {{ role_name|title }} accounts</h2><p>Profiles are visible to HOD/Admin.</p></div></div>
   <div class="row g-3">
     {% for person in users %}
-    <div class="col-md-6 col-xl-4"><div class="person-management-card">
-      <a class="person-card" href="{{ url_for('hod.user_profile',user_id=person.id) }}">
+    <div class="col-md-6 col-xl-4"><a class="person-card" href="{{ url_for('hod.user_profile',user_id=person.id) }}">
         <span class="person-avatar">{{ person.full_name[:1]|upper }}</span><span class="person-card-copy"><strong>{{ person.full_name }}</strong><small>{{ person.phone }}</small><small>{{ 'Active' if person.active else 'Inactive' }}</small></span><span class="person-arrow">→</span>
-      </a>
-      {% if role_name=='student' %}
-      <div class="person-management-controls">
-        <form method="post" action="{{ url_for('hod.assign_student_route',user_id=person.id) }}" class="mb-3">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <label class="form-label small" for="route-{{ person.id }}">Assigned bus route</label>
-          <div class="d-flex gap-2"><select class="form-select form-select-sm" id="route-{{ person.id }}" name="route_id"><option value="">No route</option>{% for route in routes %}<option value="{{ route.id }}" {% if person.student_profile and person.student_profile.route_id==route.id %}selected{% endif %}>{{ route.name }}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-primary">Save</button></div>
-        </form>
-        <form method="post" enctype="multipart/form-data" action="{{ url_for('hod.student_photo',user_id=person.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          {% if person.student_profile and person.student_profile.id_photo %}<div class="d-flex align-items-center gap-2 mb-2"><img class="student-photo-thumb" src="{{ url_for('uploads',filename=person.student_profile.id_photo) }}" alt="Student ID photo"><small class="text-muted">ID photo uploaded</small></div>{% endif %}
-          <label class="form-label small" for="photo-{{ person.id }}">{{ 'Replace ID photo' if person.student_profile and person.student_profile.id_photo else 'Upload ID photo' }}</label><input class="form-control form-control-sm" id="photo-{{ person.id }}" type="file" name="photo" accept="image/png,image/jpeg,image/webp" required><button class="btn btn-sm btn-outline-secondary mt-2">{{ 'Replace photo' if person.student_profile and person.student_profile.id_photo else 'Upload photo' }}</button>
-        </form>
-      </div>
-      {% endif %}
-    </div></div>
+      </a></div>
     {% else %}<div class="col-12"><p class="text-muted mb-0">No {{ role_name }} accounts yet.</p></div>{% endfor %}
   </div>
 </div>

@@ -63,8 +63,7 @@ def people(role_name):
         return "Unknown people section", 404
     role=Role.query.filter_by(name=role_name).first_or_404()
     users=User.query.filter_by(role_id=role.id).order_by(User.full_name).all()
-    routes=BusRoute.query.filter_by(active=True).order_by(BusRoute.name).all() if role_name=="student" else []
-    return render_template("hod/people.html", title=f"{role_name.title()} Section", role_name=role_name, users=users,routes=routes)
+    return render_template("hod/people.html", title=f"{role_name.title()} Section", role_name=role_name, users=users)
 
 @bp.get("/users/<int:user_id>")
 @login_required
@@ -166,11 +165,11 @@ def student_photo(user_id):
     else:
         ext=file.filename.rsplit(".",1)[1].lower();header=file.stream.read(12);file.stream.seek(0)
         valid=(ext=="png" and header.startswith(b"\x89PNG\r\n\x1a\n")) or (ext in ("jpg","jpeg") and header.startswith(b"\xff\xd8\xff")) or (ext=="webp" and header.startswith(b"RIFF") and header[8:12]==b"WEBP")
-        if not valid: flash("The uploaded file does not match a supported image format.","error");return redirect(url_for("hod.people",role_name="student"))
+        if not valid: flash("The uploaded file does not match a supported image format.","error");return redirect(url_for("hod.user_profile",user_id=user.id))
         path=Path(__import__('flask').current_app.config["UPLOAD_FOLDER"]);path.mkdir(parents=True,exist_ok=True)
         name=f"{uuid.uuid4().hex}.{ext}";file.save(path/name);profile.id_photo=name
         db.session.add(AuditLog(actor_id=current_user.id,action="student.photo_updated",target=f"student:{user.id}",ip_address=request.remote_addr));db.session.commit();flash("Student photo saved.","success")
-    return redirect(url_for("hod.people",role_name="student"))
+    return redirect(url_for("hod.user_profile",user_id=user.id))
 
 @bp.post("/routes")
 @login_required
@@ -269,4 +268,4 @@ def assign_student_route(user_id):
         else:
             u.student_profile.route_id=route.id if route else None
             db.session.add(AuditLog(actor_id=current_user.id,action="student.route_assigned",target=f"student:{u.id} -> {route.name if route else 'none'}",ip_address=request.remote_addr));db.session.commit();flash("Student route updated.","success")
-    return redirect(url_for("hod.people",role_name="student"))
+    return redirect(url_for("hod.user_profile",user_id=u.id))
