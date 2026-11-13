@@ -63,7 +63,8 @@ def people(role_name):
         return "Unknown people section", 404
     role=Role.query.filter_by(name=role_name).first_or_404()
     users=User.query.filter_by(role_id=role.id).order_by(User.full_name).all()
-    return render_template("hod/people.html", title=f"{role_name.title()} Section", role_name=role_name, users=users)
+    routes=BusRoute.query.filter_by(active=True).order_by(BusRoute.name).all() if role_name=="student" else []
+    return render_template("hod/people.html", title=f"{role_name.title()} Section", role_name=role_name, users=users,routes=routes)
 
 @bp.get("/users/<int:user_id>")
 @login_required
@@ -100,7 +101,7 @@ def edit_user(user_id):
             profile=StudentProfile(user_id=user.id);db.session.add(profile)
         student_number=request.form.get("student_number", "").strip() or None
         number_used=StudentProfile.query.filter(StudentProfile.student_number==student_number,StudentProfile.user_id!=user.id).first() if student_number else None
-        route_id=request.form.get("route_id",type=int)
+        route_id=request.form.get("route_id",type=int) if "route_id" in request.form else None
         route=BusRoute.query.filter_by(id=route_id,active=True).first() if route_id else None
         if number_used:
             flash("That student number is already assigned to another profile.","error")
@@ -108,7 +109,8 @@ def edit_user(user_id):
         if route_id and not route:
             flash("Choose a valid active route.","error")
             return redirect(url_for("hod.user_profile",user_id=user.id))
-        profile.student_number=student_number;profile.department=request.form.get("department", "").strip() or None;profile.year_level=request.form.get("year_level", "").strip() or None;profile.route_id=route.id if route else None
+        profile.student_number=student_number;profile.department=request.form.get("department", "").strip() or None;profile.year_level=request.form.get("year_level", "").strip() or None
+        if "route_id" in request.form:profile.route_id=route.id if route else None
     elif user.role_name=="driver":
         profile=DriverProfile.query.filter_by(user_id=user.id).first()
         if not profile:profile=DriverProfile(user_id=user.id);db.session.add(profile)
@@ -156,16 +158,19 @@ def create_user():
 @roles_required("admin")
 def student_photo(user_id):
     user=User.query.get_or_404(user_id)
-    if user.role_name!="student" or not user.student_profile: return "Not a student",404
+    if user.role_name!="student": return "Not a student",404
+    profile=user.student_profile
+    if not profile:profile=StudentProfile(user_id=user.id);db.session.add(profile);db.session.flush()
     file=request.files.get("photo"); allowed={"png","jpg","jpeg","webp"}
     if not file or "." not in file.filename or file.filename.rsplit(".",1)[1].lower() not in allowed: flash("Choose a PNG, JPG, or WebP image.","error")
     else:
         ext=file.filename.rsplit(".",1)[1].lower();header=file.stream.read(12);file.stream.seek(0)
         valid=(ext=="png" and header.startswith(b"\x89PNG\r\n\x1a\n")) or (ext in ("jpg","jpeg") and header.startswith(b"\xff\xd8\xff")) or (ext=="webp" and header.startswith(b"RIFF") and header[8:12]==b"WEBP")
-        if not valid: flash("The uploaded file does not match a supported image format.","error");return redirect(url_for("hod.dashboard"))
+        if not valid: flash("The uploaded file does not match a supported image format.","error");return redirect(url_for("hod.people",role_name="student"))
         path=Path(__import__('flask').current_app.config["UPLOAD_FOLDER"]);path.mkdir(parents=True,exist_ok=True)
-        name=f"{uuid.uuid4().hex}.{ext}";file.save(path/name);user.student_profile.id_photo=name;db.session.commit();flash("Student photo saved.","success")
-    return redirect(url_for("hod.dashboard"))
+        name=f"{uuid.uuid4().hex}.{ext}";file.save(path/name);profile.id_photo=name
+        db.session.add(AuditLog(actor_id=current_user.id,action="student.photo_updated",target=f"student:{user.id}",ip_address=request.remote_addr));db.session.commit();flash("Student photo saved.","success")
+    return redirect(url_for("hod.people",role_name="student"))
 
 @bp.post("/routes")
 @login_required
@@ -255,10 +260,13 @@ def delete_route(route_id):
 @roles_required("admin")
 def assign_student_route(user_id):
     u=User.query.get_or_404(user_id)
+    if u.role_name!="student":return "Not a student",404
+    if not u.student_profile:
+        u.student_profile=StudentProfile(user_id=u.id);db.session.flush()
     if u.student_profile:
         route_id=request.form.get("route_id",type=int);route=BusRoute.query.filter_by(id=route_id,active=True).first() if route_id else None
         if route_id and not route:flash("Choose a valid active route.","error")
         else:
             u.student_profile.route_id=route.id if route else None
             db.session.add(AuditLog(actor_id=current_user.id,action="student.route_assigned",target=f"student:{u.id} -> {route.name if route else 'none'}",ip_address=request.remote_addr));db.session.commit();flash("Student route updated.","success")
-    return redirect(url_for("hod.dashboard"))
+    return redirect(url_for("hod.people",role_name="student"))

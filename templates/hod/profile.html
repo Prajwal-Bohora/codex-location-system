@@ -19,7 +19,7 @@
         <label class="form-label">Student number</label><input class="form-control mb-3" name="student_number" value="{{ user.student_profile.student_number if user.student_profile else '' }}">
         <label class="form-label">Department</label><input class="form-control mb-3" name="department" value="{{ user.student_profile.department if user.student_profile else '' }}">
         <label class="form-label">Year level</label><input class="form-control mb-3" name="year_level" value="{{ user.student_profile.year_level if user.student_profile else '' }}">
-        <label class="form-label">Bus route</label><select class="form-select mb-3" name="route_id"><option value="">No route assigned</option>{% for route in routes %}<option value="{{ route.id }}" {% if user.student_profile and user.student_profile.route_id==route.id %}selected{% endif %}>{{ route.name }}</option>{% endfor %}</select>
+        <p><strong>Assigned route:</strong> {{ user.student_profile.route.name if user.student_profile and user.student_profile.route else 'None' }}. Route assignment is managed in the Student section.</p>
       {% elif user.role_name=='driver' %}
         <label class="form-label">Emergency contact name</label><input class="form-control mb-3" name="emergency_contact_name" value="{{ driver_profile.emergency_contact_name if driver_profile else '' }}">
         <label class="form-label">Emergency contact phone</label><input class="form-control mb-3" name="emergency_contact_phone" value="{{ driver_profile.emergency_contact_phone if driver_profile else '' }}">
