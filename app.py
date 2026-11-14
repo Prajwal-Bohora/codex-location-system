@@ -84,7 +84,10 @@ def create_app(config_override=None):
         from flask import send_from_directory
         from models import StudentProfile
         profile=StudentProfile.query.filter_by(id_photo=filename).first()
-        if current_user.role_name not in ("admin","super_admin") and (not profile or profile.user_id!=current_user.id):return "Forbidden",403
+        can_view=current_user.role_name in ("admin","super_admin") or bool(profile and profile.user_id==current_user.id)
+        if current_user.role_name=="teacher" and profile and profile.user and profile.user.role_name=="student" and profile.user.active:
+            can_view=True
+        if not can_view:return "Forbidden",403
         return send_from_directory(app.config["UPLOAD_FOLDER"],filename)
     @app.errorhandler(403)
     def forbidden(e):
